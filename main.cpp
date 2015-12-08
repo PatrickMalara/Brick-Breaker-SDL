@@ -141,7 +141,7 @@ public:
 	SDL_Rect pColliderMid;
 	SDL_Rect pColliderRight;
 
-// FOR NOW private:
+	// FOR NOW private:
 	//The X and Y offsets of the dot
 	int mPosX, mPosY;
 
@@ -346,7 +346,7 @@ int LTexture::getHeight()
 Player::Player()
 {
 	//Initialize the offsets
-	mPosX = ( SCREEN_WIDTH / 2 ) - ( PLAYER_WIDTH / 2);
+	mPosX = (SCREEN_WIDTH / 2) - (PLAYER_WIDTH / 2);
 	mPosY = SCREEN_HEIGHT - PLAYER_HEIGHT - 20;
 
 	//Initialize the velocity
@@ -364,7 +364,7 @@ Player::Player()
 
 	pColliderMid.w = 26;
 	pColliderMid.h = 26;
-	pColliderMid.x = mPosX + 26 ;
+	pColliderMid.x = mPosX + 26;
 	pColliderMid.y = mPosY;
 
 	pColliderRight.w = 26;
@@ -524,8 +524,8 @@ void Enemy::move()
 	}
 }
 
-bool Enemy::render(	SDL_Rect& playerBullet, Player& playerObj, int& ballXDir,
-					int& ballYDir, SDL_Rect& ballRect)
+bool Enemy::render(SDL_Rect& playerBullet, Player& playerObj, int& ballXDir,
+	int& ballYDir, SDL_Rect& ballRect)
 {
 	if (checkCollision(ballRect, eColliderUp) && ballYDir == +3)
 	{
@@ -567,7 +567,7 @@ bool Enemy::render(	SDL_Rect& playerBullet, Player& playerObj, int& ballXDir,
 		return false;
 	}
 	else
-	  {
+	{
 		if (healthPoints == 1)
 			isAlive = true;
 		else if (healthPoints == 0)
@@ -625,7 +625,7 @@ bool init()
 			//Load the joystick
 			gGameController = SDL_JoystickOpen(0);
 			if (gGameController == NULL)
-				printf("Warning: unable to use the game controller SDL Error: %s\n", SDL_GetError() );
+				printf("Warning: unable to use the game controller SDL Error: %s\n", SDL_GetError());
 		}
 		//Create window
 		gWindow = SDL_CreateWindow("Brick Breaker", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, SCREEN_WIDTH, SCREEN_HEIGHT, SDL_WINDOW_SHOWN);
@@ -763,8 +763,8 @@ int main(int argc, char* args[])
 
 			int ballX = SCREEN_WIDTH / 2;
 			int ballY = SCREEN_HEIGHT / 2;
-			int ballYDir = 0;
-			int ballXDir = 0;
+			int ballYDir = +3;
+			int ballXDir = +3;
 
 			//While application is running
 			while (isRunning)
@@ -891,7 +891,7 @@ int main(int argc, char* args[])
 	}
 
 	std::cout << "Closing down the window! T-2sec" << std::endl;
-	
+
 
 	SDL_Delay(2000);
 
