@@ -9,8 +9,11 @@ DATE: November 8, 2015
 #include <stdio.h>
 #include <string>
 #include <sstream>
+#include <SDL_ttf.h>
+#include <SDL_mixer.h>
 #include <iostream>
 #include <SDL_image.h>
+#include <cmath>
 
 //Screen Dimensions
 const int SCREEN_WIDTH = 800;
@@ -24,11 +27,15 @@ bool isRunning = true;
 bool enemyShoot = false;
 
 //Will be use later
-enum GAMEMODE{
+enum class GAMEMODE{
 	MENU,
+	EXIT,
 	PLAY,
-	SCORE
+	SCORE,
+	PAUSE
 };
+
+GAMEMODE GameState = GAMEMODE::PLAY;
 
 //Texture wrapper class
 class LTexture
@@ -119,7 +126,8 @@ public:
 	//Maximum axis velocity of the dot
 	static const int PLAYER_VEL = 9;
 
-	unsigned int score;
+	int score = 0;
+	std::string textScore = std::to_string(score);
 
 	unsigned int healthPoints;
 	unsigned int lives;
@@ -159,7 +167,7 @@ public:
 	int healthPoints = 1;
 	bool isAlive = true;
 	//The direction of the enemy
-	bool dir = true;
+	bool point = false;
 
 	//moving the enemy right
 	void move();
@@ -193,7 +201,22 @@ SDL_Renderer* gRenderer = NULL;
 //texter of the player
 LTexture gPlayerTexture;
 
+//Rendered texture
+LTexture gTextTexture;
+
 SDL_Joystick* gGameController = NULL;
+
+//The music that will be played
+Mix_Music *gMusic = NULL;
+
+//The sound effects that will be used
+Mix_Chunk *gBounce = NULL;
+Mix_Chunk *gHigh = NULL;
+Mix_Chunk *gMedium = NULL;
+Mix_Chunk *gLow = NULL;
+
+//Globally used font
+TTF_Font *gFont = NULL;
 
 LTexture::LTexture()
 {
@@ -372,8 +395,6 @@ Player::Player()
 	pColliderRight.x = mPosX + 52;
 	pColliderRight.y = mPosY;
 
-
-
 }
 
 void Player::handleEvent(SDL_Event& e)
@@ -519,8 +540,6 @@ void Enemy::move()
 		eColliderLeft.x = 0 - ENEMY_WIDTH;
 		eColliderRight.y = 0 - ENEMY_HEIGHT;
 		eColliderRight.x = 0 - ENEMY_WIDTH;
-
-
 	}
 }
 
@@ -531,18 +550,18 @@ bool Enemy::render(SDL_Rect& playerBullet, Player& playerObj, int& ballXDir,
 	{
 		ballYDir = -3;
 		if (ballXDir == -3)
-			ballXDir == +3;
+			ballXDir = +3;
 		if (ballXDir == +3)
-			ballXDir == -3;
+			ballXDir = -3;
 		healthPoints--;
 	}
 	if (checkCollision(ballRect, eColliderDown) && ballYDir == -3)
 	{
 		ballYDir = +3;
 		if (ballXDir == -3)
-			ballXDir == +3;
+			ballXDir = +3;
 		if (ballXDir == +3)
-			ballXDir == -3;
+			ballXDir = -3;
 		healthPoints--;
 		isAlive = false;
 	}
@@ -560,11 +579,9 @@ bool Enemy::render(SDL_Rect& playerBullet, Player& playerObj, int& ballXDir,
 	}
 	if (checkCollision(eColliderDown, playerBullet))
 	{
-		healthPoints = 0;
-
-		playerObj.score += 100;
-
-		return false;
+		ballXDir = -3;
+		healthPoints--;
+		isAlive = false;
 	}
 	else
 	{
@@ -594,7 +611,15 @@ bool Enemy::render(SDL_Rect& playerBullet, Player& playerObj, int& ballXDir,
 			return true;
 		}
 		else if (!isAlive)
+		{
+			if (point == false)
+			{
+				playerObj.score += 100;
+				playerObj.textScore = std::to_string(playerObj.score);
+				point = true;
+			}
 			return false;
+		}
 		return false;
 	}
 }
@@ -628,7 +653,7 @@ bool init()
 				printf("Warning: unable to use the game controller SDL Error: %s\n", SDL_GetError());
 		}
 		//Create window
-		gWindow = SDL_CreateWindow("Brick Breaker", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, SCREEN_WIDTH, SCREEN_HEIGHT, SDL_WINDOW_SHOWN);
+		gWindow = SDL_CreateWindow("Patrick's Super Duper Radical Brick Breaker Sensation", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, SCREEN_WIDTH, SCREEN_HEIGHT, SDL_WINDOW_SHOWN);
 		if (gWindow == NULL)
 		{
 			printf("Window could not be created! SDL Error: %s\n", SDL_GetError());
@@ -655,6 +680,20 @@ bool init()
 					printf("SDL_image could not initialize! SDL_image Error: %s\n", IMG_GetError());
 					success = false;
 				}
+
+				//Initialize SDL_mixer
+				if (Mix_OpenAudio(22050, MIX_DEFAULT_FORMAT, 2, 2048) < 0)
+				{
+					printf("SDL_mixer could not initialize! SDL_mixer Error: %s\n", Mix_GetError());
+					success = false;
+				}
+
+				//Initialize SDL_ttf
+				if (TTF_Init() == -1)
+				{
+					printf("SDL_ttf could not initialize! SDL_ttf Error: %s\n", TTF_GetError());
+					success = false;
+				}
 			}
 		}
 	}
@@ -674,6 +713,24 @@ bool loadMedia()
 		success = false;
 	}
 
+	//Load music
+	gMusic = Mix_LoadMUS("C:/Users/Owner/Desktop/Elboded My Wife.wav");
+	if (gMusic == NULL)
+	{
+		printf("Failed to load beat music! SDL_mixer Error: %s\n", Mix_GetError());
+		success = false;
+	}
+
+	//Load sound effects 
+	/*
+	gBounce = Mix_LoadWAV("21_sound_effects_and_music/scratch.wav");
+	if (gBounce == NULL)
+	{
+		printf("Failed to load scratch sound effect! SDL_mixer Error: %s\n", Mix_GetError());
+		success = false;
+	}
+	*/
+
 	return success;
 }
 
@@ -681,6 +738,7 @@ void close()
 {
 	//Free loaded images
 	gPlayerTexture.free();
+	gTextTexture.free();
 
 	//Close the game controller if there is one
 	if (SDL_NumJoysticks() > 1)
@@ -689,6 +747,14 @@ void close()
 		gGameController = NULL;
 	}
 
+	//Free global font
+	TTF_CloseFont(gFont);
+	gFont = NULL;
+
+	//Free the music
+	Mix_FreeMusic(gMusic);
+	gMusic = NULL;
+
 	//Destroy window	
 	SDL_DestroyRenderer(gRenderer);
 	SDL_DestroyWindow(gWindow);
@@ -696,12 +762,16 @@ void close()
 	gRenderer = NULL;
 
 	//Quit SDL subsystems
+	TTF_Quit();
+	Mix_Quit();
 	IMG_Quit();
 	SDL_Quit();
 }
 
 int main(int argc, char* args[])
 {
+	GAMEMODE::PLAY;
+
 	//Start up SDL and create window
 	if (!init())
 	{
@@ -766,8 +836,15 @@ int main(int argc, char* args[])
 			int ballYDir = +3;
 			int ballXDir = +3;
 
+			//If there is no music playing
+			if (Mix_PlayingMusic() == 0)
+			{
+				//Play the music
+				Mix_PlayMusic(gMusic, -1);
+			}
+
 			//While application is running
-			while (isRunning)
+			while (GameState == GAMEMODE::PLAY)
 			{
 
 				//Handle events on queue
@@ -776,7 +853,7 @@ int main(int argc, char* args[])
 					//User requests quit
 					if (e.type == SDL_QUIT)
 					{
-						isRunning = false;
+						GameState = GAMEMODE::EXIT;
 					}
 					//Reset start time on return keypress
 					else if (e.type == SDL_KEYDOWN && e.key.keysym.sym == SDLK_RETURN)
@@ -864,12 +941,10 @@ int main(int argc, char* args[])
 				if (ballY >= 580)
 				{
 					ballYDir = -3;
-					isRunning = false;
+					GameState = GAMEMODE::SCORE;
 				}
 				if (checkCollision(ballRect, player.pColliderMid) && ballYDir == +3)
-				{
 					ballYDir = -3;
-				}
 				if (checkCollision(ballRect, player.pColliderLeft) && ballYDir == +3)
 				{
 					ballYDir = -3;
@@ -882,9 +957,26 @@ int main(int argc, char* args[])
 					if (ballXDir == -3)
 						ballXDir = +3;
 				}
-				//std::cout << "Score is: " << player.score << std::endl;
-				//std::cout << "Milliseconds since start time " << SDL_GetTicks() - startTime << std::endl;
-				//Update screen
+
+				//Open the font
+				gFont = TTF_OpenFont("lost_in_future_0.ttf", 28);
+				if (gFont == NULL)
+				{
+					printf("Failed to load lazy font! SDL_ttf Error: %s\n", TTF_GetError());
+				}
+				else
+				{
+					//Render text
+					SDL_Color textColor = { 255, 255, 255 };
+					if (!gTextTexture.loadFromRenderedText(player.textScore, textColor))
+					{
+						printf("Failed to render text texture!\n");
+					}
+				}
+
+				//Render current frame
+				gTextTexture.render((SCREEN_WIDTH - gTextTexture.getWidth()) , (SCREEN_HEIGHT - gTextTexture.getHeight()));
+
 				SDL_RenderPresent(gRenderer);
 			}
 		}
@@ -892,8 +984,10 @@ int main(int argc, char* args[])
 
 	std::cout << "Closing down the window! T-2sec" << std::endl;
 
-
 	SDL_Delay(2000);
+
+	//Stop the music
+	Mix_HaltMusic();
 
 	//Free the resources and close SDL
 	close();
