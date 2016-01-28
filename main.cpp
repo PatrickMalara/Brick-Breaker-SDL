@@ -1,7 +1,7 @@
 /*
 PROGRAM: Brick Breakers Using SDL
 AUTHOR: Patrick Malara
-DATE: November 8, 2015
+DATE: Start~November 8, 2015 | End~December 24, 2015
 */
 
 //Including All of the cool stuff
@@ -14,28 +14,26 @@ DATE: November 8, 2015
 #include <iostream>
 #include <SDL_image.h>
 #include <cmath>
+#include <iostream>
 
 //Screen Dimensions
 const int SCREEN_WIDTH = 800;
 const int SCREEN_HEIGHT = 600;
-
 const int JOYSTICK_DEAD_ZONE = 8000;
 
 //Main loop flag
 bool isRunning = true;
 
-bool enemyShoot = false;
-
-//Will be use later
+//Game Modes
 enum class GAMEMODE{
 	MENU,
 	EXIT,
 	PLAY,
 	SCORE,
-	PAUSE
+	WIN
 };
 
-GAMEMODE GameState = GAMEMODE::PLAY;
+GAMEMODE GameState = GAMEMODE::MENU;
 
 //Texture wrapper class
 class LTexture
@@ -81,38 +79,6 @@ private:
 	//Image dimensions
 	int mWidth;
 	int mHeight;
-};
-
-//The application time based timer
-class LTimer
-{
-public:
-	//Initializes variables
-	LTimer();
-
-	//The various clock actions
-	void start();
-	void stop();
-	void pause();
-	void unpause();
-
-	//Gets the timer's time
-	Uint32 getTicks();
-
-	//Checks the status of the timer
-	bool isStarted();
-	bool isPaused();
-
-private:
-	//The clock time when the timer started
-	Uint32 mStartTicks;
-
-	//The ticks stored when the timer was paused
-	Uint32 mPausedTicks;
-
-	//The timer status
-	bool mPaused;
-	bool mStarted;
 };
 
 //The player that will move around on the screen
@@ -175,6 +141,9 @@ public:
 	//Render the enemy on the screen, as long
 	// as the enemy is alive-the boolean function
 	bool render(SDL_Rect& playerBullet, Player& playerObj, int& ballXDir, int& ballYDir, SDL_Rect& ballRect);
+	void reset(int posX, int posY);
+
+	//Enemy();
 
 	Enemy(int posX, int posY);
 
@@ -211,9 +180,6 @@ Mix_Music *gMusic = NULL;
 
 //The sound effects that will be used
 Mix_Chunk *gBounce = NULL;
-Mix_Chunk *gHigh = NULL;
-Mix_Chunk *gMedium = NULL;
-Mix_Chunk *gLow = NULL;
 
 //Globally used font
 TTF_Font *gFont = NULL;
@@ -243,9 +209,7 @@ bool LTexture::loadFromFile(std::string path)
 	//Load image at specified path
 	SDL_Surface* loadedSurface = IMG_Load(path.c_str());
 	if (loadedSurface == NULL)
-	{
 		printf("Unable to load image %s! SDL_image Error: %s\n", path.c_str(), IMG_GetError());
-	}
 	else
 	{
 		//Color key image
@@ -254,9 +218,7 @@ bool LTexture::loadFromFile(std::string path)
 		//Create texture from surface pixels
 		newTexture = SDL_CreateTextureFromSurface(gRenderer, loadedSurface);
 		if (newTexture == NULL)
-		{
 			printf("Unable to create texture from %s! SDL Error: %s\n", path.c_str(), SDL_GetError());
-		}
 		else
 		{
 			//Get image dimensions
@@ -286,9 +248,7 @@ bool LTexture::loadFromRenderedText(std::string textureText, SDL_Color textColor
 		//Create texture from surface pixels
 		mTexture = SDL_CreateTextureFromSurface(gRenderer, textSurface);
 		if (mTexture == NULL)
-		{
 			printf("Unable to create texture from rendered text! SDL Error: %s\n", SDL_GetError());
-		}
 		else
 		{
 			//Get image dimensions
@@ -300,10 +260,7 @@ bool LTexture::loadFromRenderedText(std::string textureText, SDL_Color textColor
 		SDL_FreeSurface(textSurface);
 	}
 	else
-	{
 		printf("Unable to render text surface! SDL_ttf Error: %s\n", TTF_GetError());
-	}
-
 
 	//Return success
 	return mTexture != NULL;
@@ -409,6 +366,12 @@ void Player::handleEvent(SDL_Event& e)
 		case SDLK_DOWN: mVelY += PLAYER_VEL; break;
 		case SDLK_LEFT: mVelX -= PLAYER_VEL; break;
 		case SDLK_RIGHT: mVelX += PLAYER_VEL; break;
+		case SDLK_SPACE:
+			if (GameState == GAMEMODE::MENU)
+				GameState = GAMEMODE::PLAY;
+			else if (GameState == GAMEMODE::SCORE || GameState == GAMEMODE::WIN)
+				GameState = GAMEMODE::MENU;
+			break;
 		}
 	}
 	//If a key was released
@@ -431,15 +394,12 @@ void Player::move()
 	pColliderMid.x = mPosX + 26;
 	pColliderRight.x = mPosX + 52;
 
-	//Move the dot left or right
+	//Move the player left or right
 	mPosX += mVelX;
 
-	//If the dot went too far to the left or right
+	//If the player went too far to the left or right
 	if ((mPosX < 0) || (mPosX + PLAYER_WIDTH > SCREEN_WIDTH))
-	{
-		//Move back
-		mPosX -= mVelX;
-	}
+		mPosX -= mVelX;//Move back
 }
 
 void Player::render()
@@ -479,7 +439,6 @@ Enemy::Enemy(int posX, int posY)
 	eVel = 4;
 }
 
-//TODO use the SDL Collision function for the collision detection, dont be a hipster and make your own
 bool checkCollision(SDL_Rect a, SDL_Rect b)
 {
 	//The sides of the rectangles
@@ -502,24 +461,16 @@ bool checkCollision(SDL_Rect a, SDL_Rect b)
 
 	//If any of the sides from A are outside of B
 	if (bottomA <= topB)
-	{
 		return false;
-	}
 
 	if (topA >= bottomB)
-	{
 		return false;
-	}
 
 	if (rightA <= leftB)
-	{
 		return false;
-	}
 
 	if (leftA >= rightB)
-	{
 		return false;
-	}
 
 	//If none of the sides from A are outside B
 	return true;
@@ -548,6 +499,7 @@ bool Enemy::render(SDL_Rect& playerBullet, Player& playerObj, int& ballXDir,
 {
 	if (checkCollision(ballRect, eColliderUp) && ballYDir == +3)
 	{
+		Mix_PlayChannel(-1, gBounce, 0);
 		ballYDir = -3;
 		if (ballXDir == -3)
 			ballXDir = +3;
@@ -557,6 +509,7 @@ bool Enemy::render(SDL_Rect& playerBullet, Player& playerObj, int& ballXDir,
 	}
 	if (checkCollision(ballRect, eColliderDown) && ballYDir == -3)
 	{
+		Mix_PlayChannel(-1, gBounce, 0);
 		ballYDir = +3;
 		if (ballXDir == -3)
 			ballXDir = +3;
@@ -567,18 +520,21 @@ bool Enemy::render(SDL_Rect& playerBullet, Player& playerObj, int& ballXDir,
 	}
 	if (checkCollision(ballRect, eColliderLeft) && ballYDir == -3)
 	{
+		Mix_PlayChannel(-1, gBounce, 0);
 		ballXDir = -3;
 		healthPoints--;
 		isAlive = false;
 	}
 	if (checkCollision(ballRect, eColliderRight) && ballYDir == -3)
 	{
+		Mix_PlayChannel(-1, gBounce, 0);
 		ballXDir = +3;
 		healthPoints--;
 		isAlive = false;
 	}
 	if (checkCollision(eColliderDown, playerBullet))
 	{
+		Mix_PlayChannel(-1, gBounce, 0);
 		ballXDir = -3;
 		healthPoints--;
 		isAlive = false;
@@ -622,6 +578,43 @@ bool Enemy::render(SDL_Rect& playerBullet, Player& playerObj, int& ballXDir,
 		}
 		return false;
 	}
+
+	return false;
+}
+
+void Enemy::reset(int posX, int posY)
+{
+	ePosX = posX;
+	ePosY = posY;
+
+	eRect.w = ENEMY_WIDTH;
+	eRect.h = ENEMY_HEIGHT;
+	eRect.x = ePosX;
+	eRect.y = ePosY;
+	eColliderUp.w = ENEMY_WIDTH - 4;
+	eColliderUp.h = ENEMY_HEIGHT / 2;
+	eColliderUp.x = ePosX + 2;
+	eColliderUp.y = ePosY;
+
+	eColliderDown.w = ENEMY_WIDTH - 4;
+	eColliderDown.h = ENEMY_HEIGHT / 2;
+	eColliderDown.x = ePosX + 2;
+	eColliderDown.y = ePosY + ENEMY_HEIGHT / 2;
+
+	eColliderRight.w = ENEMY_WIDTH / 2;
+	eColliderRight.h = ENEMY_HEIGHT - 4;
+	eColliderRight.x = ePosX + ENEMY_WIDTH / 2;
+	eColliderRight.y = ePosY + 2;
+
+	eColliderLeft.w = ENEMY_WIDTH / 2 + 2;
+	eColliderLeft.h = ENEMY_HEIGHT - 4;
+	eColliderLeft.x = ePosX;
+	eColliderLeft.y = ePosY;
+	eVel = 4;
+
+	isAlive = true;
+	healthPoints = 1;
+	point = false;
 }
 
 bool init()
@@ -639,9 +632,7 @@ bool init()
 	{
 		//Set texture filtering to linear
 		if (!SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "1"))
-		{
 			printf("Warning: Linear texture filtering not enabled!");
-		}
 		//Make sure there is a joystick
 		if (SDL_NumJoysticks() < 1)
 			printf("No Joystick");
@@ -714,7 +705,7 @@ bool loadMedia()
 	}
 
 	//Load music
-	gMusic = Mix_LoadMUS("C:/Users/Owner/Desktop/Elboded My Wife.wav");
+	gMusic = Mix_LoadMUS("C:/Users/Owner/Desktop/Patrick is good at making music.wav");
 	if (gMusic == NULL)
 	{
 		printf("Failed to load beat music! SDL_mixer Error: %s\n", Mix_GetError());
@@ -722,14 +713,12 @@ bool loadMedia()
 	}
 
 	//Load sound effects 
-	/*
-	gBounce = Mix_LoadWAV("21_sound_effects_and_music/scratch.wav");
+	gBounce = Mix_LoadWAV("Bounce.wav");
 	if (gBounce == NULL)
 	{
 		printf("Failed to load scratch sound effect! SDL_mixer Error: %s\n", Mix_GetError());
 		success = false;
 	}
-	*/
 
 	return success;
 }
@@ -739,6 +728,9 @@ void close()
 	//Free loaded images
 	gPlayerTexture.free();
 	gTextTexture.free();
+
+	//Free the music Chunk
+	Mix_FreeChunk(gBounce);
 
 	//Close the game controller if there is one
 	if (SDL_NumJoysticks() > 1)
@@ -768,40 +760,20 @@ void close()
 	SDL_Quit();
 }
 
-int main(int argc, char* args[])
+void run()
 {
-	GAMEMODE::PLAY;
-
 	//Start up SDL and create window
 	if (!init())
-	{
 		printf("Failed to initialize!\n");
-	}
 	else
 	{
 		//Load media
 		if (!loadMedia())
-		{
 			printf("Failed to load media!\n");
-		}
 		else
 		{
-
 			//Event handler
 			SDL_Event e;
-
-			/*Game Controller Continue
-			//Normalized direction
-			int xDir = 0;
-			int yDir = 0;
-			*/
-			//LTimer fpsTimer;
-
-			//Current time start time
-			//Uint32 startTime = 0;
-
-			//In memory text stream
-			//std::stringstream timeText;
 
 			//The Player that will be moving around on the screen
 			Player player;
@@ -838,159 +810,299 @@ int main(int argc, char* args[])
 
 			//If there is no music playing
 			if (Mix_PlayingMusic() == 0)
-			{
-				//Play the music
-				Mix_PlayMusic(gMusic, -1);
-			}
+				Mix_PlayMusic(gMusic, -1);//Play the music
 
 			//While application is running
-			while (GameState == GAMEMODE::PLAY)
+			while (isRunning == true)
 			{
-
-				//Handle events on queue
-				while (SDL_PollEvent(&e) != 0)
+				switch (GameState)
 				{
-					//User requests quit
-					if (e.type == SDL_QUIT)
-					{
-						GameState = GAMEMODE::EXIT;
-					}
-					//Reset start time on return keypress
-					else if (e.type == SDL_KEYDOWN && e.key.keysym.sym == SDLK_RETURN)
-					{
-						//startTime = SDL_GetTicks();
-					}
-					//Handle input for the dot
-					player.handleEvent(e);
-				}
-
-				//Move the Player
-				player.move();
-
-				//Clear screen
-				SDL_SetRenderDrawColor(gRenderer, 0x00, 0x00, 0x00, 0xFF);
-				SDL_RenderClear(gRenderer);
-
-				SDL_Rect ballRect = { ballX, ballY, 20, 20 };
-				SDL_SetRenderDrawColor(gRenderer, 0xFF, 0xFF, 0xFF, 0xFF);
-				SDL_RenderFillRect(gRenderer, &ballRect);
-
-				darthVader.render(ballRect, player, ballXDir, ballYDir, ballRect);
-				darthVader.move();
-				stormTrooper.render(ballRect, player, ballXDir, ballYDir, ballRect);
-				stormTrooper.move();
-				bobaFett.render(ballRect, player, ballXDir, ballYDir, ballRect);
-				bobaFett.move();
-				lukeSkywalker.render(ballRect, player, ballXDir, ballYDir, ballRect);
-				lukeSkywalker.move();
-				yodaYoda.render(ballRect, player, ballXDir, ballYDir, ballRect);
-				yodaYoda.move();
-				obiWan.render(ballRect, player, ballXDir, ballYDir, ballRect);
-				obiWan.move();
-				hanSolo.render(ballRect, player, ballXDir, ballYDir, ballRect);
-				hanSolo.move();
-				deathStar.render(ballRect, player, ballXDir, ballYDir, ballRect);
-				deathStar.move();
-
-				darthVader2.render(ballRect, player, ballXDir, ballYDir, ballRect);
-				darthVader2.move();
-				stormTrooper2.render(ballRect, player, ballXDir, ballYDir, ballRect);
-				stormTrooper2.move();
-				bobaFett2.render(ballRect, player, ballXDir, ballYDir, ballRect);
-				bobaFett2.move();
-				lukeSkywalker2.render(ballRect, player, ballXDir, ballYDir, ballRect);
-				lukeSkywalker2.move();
-				yodaYoda2.render(ballRect, player, ballXDir, ballYDir, ballRect);
-				yodaYoda2.move();
-				obiWan2.render(ballRect, player, ballXDir, ballYDir, ballRect);
-				obiWan2.move();
-				hanSolo2.render(ballRect, player, ballXDir, ballYDir, ballRect);
-				hanSolo2.move();
-				deathStar2.render(ballRect, player, ballXDir, ballYDir, ballRect);
-				deathStar2.move();
-
-				darthVader3.render(ballRect, player, ballXDir, ballYDir, ballRect);
-				darthVader3.move();
-				stormTrooper3.render(ballRect, player, ballXDir, ballYDir, ballRect);
-				stormTrooper3.move();
-				bobaFett3.render(ballRect, player, ballXDir, ballYDir, ballRect);
-				bobaFett3.move();
-				lukeSkywalker3.render(ballRect, player, ballXDir, ballYDir, ballRect);
-				lukeSkywalker3.move();
-				yodaYoda3.render(ballRect, player, ballXDir, ballYDir, ballRect);
-				yodaYoda3.move();
-				obiWan3.render(ballRect, player, ballXDir, ballYDir, ballRect);
-				obiWan3.move();
-				hanSolo3.render(ballRect, player, ballXDir, ballYDir, ballRect);
-				hanSolo3.move();
-				deathStar3.render(ballRect, player, ballXDir, ballYDir, ballRect);
-				deathStar3.move();
-
-				//Render objects
-				player.render();
-
-				ballX += ballXDir;
-				ballY += ballYDir;
-
-				if (ballX <= 0)
-					ballXDir = +3;
-				if (ballX >= 780)
-					ballXDir = -3;
-				if (ballY <= 0)
+				case GAMEMODE::PLAY:
+					
+					ballX = SCREEN_WIDTH / 2;
+					ballY = SCREEN_HEIGHT / 2;
 					ballYDir = +3;
-				if (ballY >= 580)
-				{
-					ballYDir = -3;
-					GameState = GAMEMODE::SCORE;
-				}
-				if (checkCollision(ballRect, player.pColliderMid) && ballYDir == +3)
-					ballYDir = -3;
-				if (checkCollision(ballRect, player.pColliderLeft) && ballYDir == +3)
-				{
-					ballYDir = -3;
-					if (ballXDir == +3)
-						ballXDir = -3;
-				}
-				if (checkCollision(ballRect, player.pColliderRight) && ballYDir == +3)
-				{
-					ballYDir = -3;
-					if (ballXDir == -3)
-						ballXDir = +3;
-				}
+					ballXDir = +3;
 
-				//Open the font
-				gFont = TTF_OpenFont("lost_in_future_0.ttf", 28);
-				if (gFont == NULL)
-				{
-					printf("Failed to load lazy font! SDL_ttf Error: %s\n", TTF_GetError());
-				}
-				else
-				{
-					//Render text
-					SDL_Color textColor = { 255, 255, 255 };
-					if (!gTextTexture.loadFromRenderedText(player.textScore, textColor))
+					darthVader.reset(100, 80);
+					stormTrooper.reset(165, 80);
+					bobaFett.reset(230, 80);
+					lukeSkywalker.reset(295, 80);
+					yodaYoda.reset(360, 80);
+					obiWan.reset(425, 80);
+					hanSolo.reset(490, 80);
+					deathStar.reset(555, 80);
+					darthVader2.reset(100, 120);
+					stormTrooper2.reset(165, 120);
+					bobaFett2.reset(230, 120);
+					lukeSkywalker2.reset(295, 120);
+					yodaYoda2.reset(360, 120);
+					obiWan2.reset(425, 120);
+					hanSolo2.reset(490, 120);
+					deathStar2.reset(555, 120);
+					darthVader3.reset(100, 160);
+					stormTrooper3.reset(165, 160);
+					bobaFett3.reset(230, 160);
+					lukeSkywalker3.reset(295, 160);
+					yodaYoda3.reset(360, 160);
+					obiWan3.reset(425, 160);
+					hanSolo3.reset(490, 160);
+					deathStar3.reset(555, 160);
+
+					while (GameState == GAMEMODE::PLAY)
 					{
-						printf("Failed to render text texture!\n");
+						//Handle events on queue			
+						while (SDL_PollEvent(&e) != 0)
+						{
+							//User requests quit
+							if (e.type == SDL_QUIT)
+							{
+								isRunning = false;
+								GameState = GAMEMODE::EXIT;
+							}
+							//Handle input for the dot
+							player.handleEvent(e);
+						}
+
+						//Move the Player
+						player.move();
+
+						//Clear screen
+						SDL_SetRenderDrawColor(gRenderer, 0x00, 0x00, 0x00, 0xFF);
+						SDL_RenderClear(gRenderer);
+
+						SDL_Rect ballRect = { ballX, ballY, 20, 20 };
+						SDL_SetRenderDrawColor(gRenderer, 0xFF, 0xFF, 0xFF, 0xFF);
+						SDL_RenderFillRect(gRenderer, &ballRect);
+						
+						darthVader.render(ballRect, player, ballXDir, ballYDir, ballRect); darthVader.move();
+						stormTrooper.render(ballRect, player, ballXDir, ballYDir, ballRect); stormTrooper.move();
+						bobaFett.render(ballRect, player, ballXDir, ballYDir, ballRect); bobaFett.move();
+						lukeSkywalker.render(ballRect, player, ballXDir, ballYDir, ballRect); lukeSkywalker.move();
+						yodaYoda.render(ballRect, player, ballXDir, ballYDir, ballRect); yodaYoda.move();
+						obiWan.render(ballRect, player, ballXDir, ballYDir, ballRect); obiWan.move();
+						hanSolo.render(ballRect, player, ballXDir, ballYDir, ballRect); hanSolo.move();
+						deathStar.render(ballRect, player, ballXDir, ballYDir, ballRect); deathStar.move();
+
+						darthVader2.render(ballRect, player, ballXDir, ballYDir, ballRect) ;darthVader2.move();
+						stormTrooper2.render(ballRect, player, ballXDir, ballYDir, ballRect); stormTrooper2.move();
+						bobaFett2.render(ballRect, player, ballXDir, ballYDir, ballRect); bobaFett2.move();
+						lukeSkywalker2.render(ballRect, player, ballXDir, ballYDir, ballRect); lukeSkywalker2.move();
+						yodaYoda2.render(ballRect, player, ballXDir, ballYDir, ballRect); yodaYoda2.move();
+						obiWan2.render(ballRect, player, ballXDir, ballYDir, ballRect); obiWan2.move();
+						hanSolo2.render(ballRect, player, ballXDir, ballYDir, ballRect); hanSolo2.move();
+						deathStar2.render(ballRect, player, ballXDir, ballYDir, ballRect); deathStar2.move();
+
+						darthVader3.render(ballRect, player, ballXDir, ballYDir, ballRect); darthVader3.move();
+						stormTrooper3.render(ballRect, player, ballXDir, ballYDir, ballRect); stormTrooper3.move();
+						bobaFett3.render(ballRect, player, ballXDir, ballYDir, ballRect); bobaFett3.move();
+						lukeSkywalker3.render(ballRect, player, ballXDir, ballYDir, ballRect); lukeSkywalker3.move();
+						yodaYoda3.render(ballRect, player, ballXDir, ballYDir, ballRect); yodaYoda3.move();
+						obiWan3.render(ballRect, player, ballXDir, ballYDir, ballRect); obiWan3.move();
+						hanSolo3.render(ballRect, player, ballXDir, ballYDir, ballRect); hanSolo3.move();
+						deathStar3.render(ballRect, player, ballXDir, ballYDir, ballRect); deathStar3.move();
+						
+						//Render objects
+						player.render();
+
+						ballX += ballXDir;
+						ballY += ballYDir;
+
+						if (ballX <= 0){
+							Mix_PlayChannel(-1, gBounce, 0);
+							ballXDir = +3;
+						}
+						if (ballX >= 780){
+							Mix_PlayChannel(-1, gBounce, 0);
+							ballXDir = -3;
+						}
+						if (ballY <= 0){
+							Mix_PlayChannel(-1, gBounce, 0);
+							ballYDir = +3;
+						}
+						if (ballY >= 580){
+							ballYDir = -3;
+							GameState = GAMEMODE::SCORE;
+						}
+						if (checkCollision(ballRect, player.pColliderMid) && ballYDir == +3){
+							Mix_PlayChannel(-1, gBounce, 0);
+							ballYDir = -3;
+						}
+						if (checkCollision(ballRect, player.pColliderLeft) && ballYDir == +3){
+							Mix_PlayChannel(-1, gBounce, 0);
+							ballYDir = -3;
+							if (ballXDir == +3)
+								ballXDir = -3;
+						}
+						if (checkCollision(ballRect, player.pColliderRight) && ballYDir == +3){
+							Mix_PlayChannel(-1, gBounce, 0);
+							ballYDir = -3;
+							if (ballXDir == -3)
+								ballXDir = +3;
+						}
+
+						//Open the font
+						gFont = TTF_OpenFont("04B_19__.ttf", 28);
+						if (gFont == NULL)
+							printf("Failed to load lazy font! SDL_ttf Error: %s\n", TTF_GetError());
+						else
+						{
+							//Render text
+							SDL_Color textColor = { 255, 255, 255 };
+							if (!gTextTexture.loadFromRenderedText(player.textScore, textColor))
+								printf("Failed to render text texture!\n");
+						}
+
+						//Render current frame
+						gTextTexture.render((SCREEN_WIDTH - gTextTexture.getWidth()), (SCREEN_HEIGHT - gTextTexture.getHeight()));
+
+						SDL_RenderPresent(gRenderer);
+
+						if (player.score == 2400)
+							GameState = GAMEMODE::WIN;
+
 					}
+					break;
+				case GAMEMODE::MENU:
+					//reseting the player's score
+					player.score = 0;
+					player.textScore = std::to_string(player.score);
+
+					while (GameState == GAMEMODE::MENU)
+					{
+						//Handle events on queue
+						while (SDL_PollEvent(&e) != 0)
+						{
+							//User requests quit
+							if (e.type == SDL_QUIT)
+							{
+								isRunning = false;
+								GameState = GAMEMODE::EXIT;
+							}
+							//Handle input for the dot
+							player.handleEvent(e);
+						}
+
+						//Clear screen
+						SDL_SetRenderDrawColor(gRenderer, 0x00, 0x00, 0x00, 0xFF);
+						SDL_RenderClear(gRenderer);
+
+						//Open the font
+						gFont = TTF_OpenFont("04B_19__.ttf", 28);
+						if (gFont == NULL)
+							printf("Failed to load lazy font! SDL_ttf Error: %s\n", TTF_GetError());
+						else
+						{
+							//Render text
+							SDL_Color textColor = { 255, 255, 255 };
+							if (!gTextTexture.loadFromRenderedText("Brick Breaker:\n\n\nPress Space", textColor))
+								printf("Failed to render text texture!\n");
+						}
+
+						//Render current frame
+						gTextTexture.render( ((SCREEN_WIDTH - gTextTexture.getWidth()) / 2), (SCREEN_HEIGHT - gTextTexture.getHeight()) / 3);
+
+						SDL_RenderPresent(gRenderer);
+					}
+					break;
+				case GAMEMODE::SCORE:
+					while (GameState == GAMEMODE::SCORE)
+					{
+						//Handle events on queue
+						while (SDL_PollEvent(&e) != 0)
+						{
+							//User requests quit
+							if (e.type == SDL_QUIT)
+							{
+								isRunning = false;
+								GameState = GAMEMODE::EXIT;
+							}
+							//Handle input for the dot
+							player.handleEvent(e);
+						}
+
+						//Clear screen
+						SDL_SetRenderDrawColor(gRenderer, 0x00, 0x00, 0x00, 0xFF);
+						SDL_RenderClear(gRenderer);
+
+						//Open the font
+						gFont = TTF_OpenFont("04B_19__.ttf", 28);
+						if (gFont == NULL)
+							printf("Failed to load lazy font! SDL_ttf Error: %s\n", TTF_GetError());
+						else
+						{
+							//Render text
+							SDL_Color textColor = { 255, 255, 255 };
+							if (!gTextTexture.loadFromRenderedText("Final Score: " + player.textScore + "\n\n\n\n\nPress Space", textColor))
+								printf("Failed to render text texture!\n");
+						}
+
+						//Render current frame
+						gTextTexture.render(((SCREEN_WIDTH - gTextTexture.getWidth()) / 2), (SCREEN_HEIGHT - gTextTexture.getHeight()) / 3);
+
+						SDL_RenderPresent(gRenderer);
+
+					}
+					break;
+				case GAMEMODE::WIN:
+					while (GameState == GAMEMODE::WIN)
+					{
+						//Handle events on queue
+						while (SDL_PollEvent(&e) != 0)
+						{
+							//User requests quit
+							if (e.type == SDL_QUIT)
+							{
+								isRunning = false;
+								GameState = GAMEMODE::EXIT;
+							}
+							//Handle input for the dot
+							player.handleEvent(e);
+						}
+
+						//Clear screen
+						SDL_SetRenderDrawColor(gRenderer, 0x00, 0x00, 0x00, 0xFF);
+						SDL_RenderClear(gRenderer);
+
+						//Open the font
+						gFont = TTF_OpenFont("04B_19__.ttf", 28);
+						if (gFont == NULL)
+							printf("Failed to load lazy font! SDL_ttf Error: %s\n", TTF_GetError());
+						else
+						{
+							//Render text
+							SDL_Color textColor = { 255, 255, 255 };
+							if (!gTextTexture.loadFromRenderedText("You Win!\n\n\n\n\nPress Space", textColor))
+								printf("Failed to render text texture!\n");
+						}
+
+						//Render current frame
+						gTextTexture.render(((SCREEN_WIDTH - gTextTexture.getWidth()) / 2), (SCREEN_HEIGHT - gTextTexture.getHeight()) / 3);
+
+						SDL_RenderPresent(gRenderer);
+
+					}
+					break;
+				default:
+					break;
 				}
-
-				//Render current frame
-				gTextTexture.render((SCREEN_WIDTH - gTextTexture.getWidth()) , (SCREEN_HEIGHT - gTextTexture.getHeight()));
-
-				SDL_RenderPresent(gRenderer);
+				
 			}
 		}
 	}
 
 	std::cout << "Closing down the window! T-2sec" << std::endl;
+}
+
+int main(int argc, char* args[])
+{
+	run(); // Play the game
 
 	SDL_Delay(2000);
 
-	//Stop the music
-	Mix_HaltMusic();
+	Mix_HaltMusic();//Stop the music
 
-	//Free the resources and close SDL
-	close();
+	close();//Free the resources and close SDL
 
 	return 0;
 }
