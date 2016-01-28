@@ -705,7 +705,7 @@ bool loadMedia()
 	}
 
 	//Load music
-	gMusic = Mix_LoadMUS("C:/Users/Owner/Desktop/Patrick is good at making music.wav");
+	gMusic = Mix_LoadMUS("Patrick is good at making music.wav");
 	if (gMusic == NULL)
 	{
 		printf("Failed to load beat music! SDL_mixer Error: %s\n", Mix_GetError());
@@ -905,6 +905,7 @@ void run()
 						//Render objects
 						player.render();
 
+						//Ball stuff| it should be a class but im lazy
 						ballX += ballXDir;
 						ballY += ballYDir;
 
