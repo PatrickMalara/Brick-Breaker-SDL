@@ -89,7 +89,7 @@ public:
 	static const int PLAYER_WIDTH = 80;
 	static const int PLAYER_HEIGHT = 40;
 
-	//Maximum axis velocity of the dot
+	//Maximum axis velocity of the player
 	static const int PLAYER_VEL = 9;
 
 	int score = 0;
@@ -101,13 +101,13 @@ public:
 	//Initializes the variables
 	Player();
 
-	//Takes key presses and adjusts the dot's velocity
+	//Takes key presses and adjusts the player's velocity
 	void handleEvent(SDL_Event& e);
 
-	//Moves the dot
+	//Moves the player
 	void move();
 
-	//Shows the dot on the screen
+	//Shows the player on the screen
 	void render();
 
 	//The rectangular colliders for the player
@@ -116,10 +116,10 @@ public:
 	SDL_Rect pColliderRight;
 
 	// FOR NOW private:
-	//The X and Y offsets of the dot
+	//The X and Y offsets of the player
 	int mPosX, mPosY;
 
-	//The velocity of the dot
+	//The velocity of the player
 	int mVelX, mVelY;
 };
 
@@ -697,10 +697,10 @@ bool loadMedia()
 	//Loading success flag
 	bool success = true;
 
-	//Load dot texture
+	//Load player texture
 	if (!gPlayerTexture.loadFromFile("Player.bmp"))
 	{
-		printf("Failed to load dot texture!\n");
+		printf("Failed to load player texture!\n");
 		success = false;
 	}
 
@@ -860,7 +860,7 @@ void run()
 								isRunning = false;
 								GameState = GAMEMODE::EXIT;
 							}
-							//Handle input for the dot
+							//Handle input for the player
 							player.handleEvent(e);
 						}
 
@@ -980,7 +980,7 @@ void run()
 								isRunning = false;
 								GameState = GAMEMODE::EXIT;
 							}
-							//Handle input for the dot
+							//Handle input for the player
 							player.handleEvent(e);
 						}
 
@@ -1018,7 +1018,7 @@ void run()
 								isRunning = false;
 								GameState = GAMEMODE::EXIT;
 							}
-							//Handle input for the dot
+							//Handle input for the player
 							player.handleEvent(e);
 						}
 
@@ -1057,7 +1057,7 @@ void run()
 								isRunning = false;
 								GameState = GAMEMODE::EXIT;
 							}
-							//Handle input for the dot
+							//Handle input for the player
 							player.handleEvent(e);
 						}
 
